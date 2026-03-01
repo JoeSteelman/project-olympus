@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum AppRole {
+  ADMIN
+  PLAYER
+}
+
+model User {
+  id          String      @id @default(cuid())
+  email       String      @unique
+  displayName String
+  role        AppRole     @default(PLAYER)
+  teamId      String?
+  avatarKey   String      @default("zeus")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  team        Team?       @relation(fields: [teamId], references: [id])
+  entries     ScoreEntry[]
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  players   User[]
+  results   ScoreEntry[]
+}
+
+model Game {
+  id                 String        @id @default(cuid())
+  key                String        @unique
+  name               String
+  category           String
+  description        String
+  enabled            Boolean       @default(true)
+  sortOrder          Int           @default(0)
+  maxAvailablePoints Int           @default(0)
+  scoringConfig      Json
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  entries            ScoreEntry[]
+}
+
+model EventConfig {
+  id            String   @id @default(cuid())
+  eventName      String   @default("Project Olympus")
+  winningScore   Int      @default(500)
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+}
+
+model ScoreEntry {
+  id           String   @id @default(cuid())
+  gameId        String
+  teamId        String
+  userId        String?
+  teamPoints    Int      @default(0)
+  playerPoints  Int      @default(0)
+  metadata      Json?
+  notes         String?
+  createdAt     DateTime @default(now())
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([gameId])
+  @@index([teamId])
+  @@index([userId])
+}
