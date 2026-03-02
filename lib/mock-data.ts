@@ -234,8 +234,8 @@ export const mockAdmin = {
     avatarKey: player.avatarKey
   })),
   teams: [
-    { id: "team-a", name: "Spartans", color: "#d8b44b", players: [] },
-    { id: "team-b", name: "Titans", color: "#1d3557", players: [] }
+    { id: "team-a", name: "Spartans", slug: "spartans", color: "#d8b44b", players: [] },
+    { id: "team-b", name: "Titans", slug: "titans", color: "#1d3557", players: [] }
   ],
   games: mockDashboard.games.map((game) => ({
     id: game.id,
