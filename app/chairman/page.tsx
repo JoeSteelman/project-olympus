@@ -6,7 +6,7 @@ import Link from "next/link";
 type Player = {
   id: string;
   displayName: string;
-  team?: { name: string } | null;
+  team?: { id: string; name: string } | null;
 };
 
 type Session = {
