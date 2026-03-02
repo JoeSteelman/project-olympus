@@ -24,6 +24,12 @@ model User {
   updatedAt   DateTime    @updatedAt
   team        Team?       @relation(fields: [teamId], references: [id])
   entries     ScoreEntry[]
+  playerState PlayerState?
+  beerSent    BeerTransaction[] @relation("BeerFrom")
+  beerReceived BeerTransaction[] @relation("BeerTo")
+  notices     Notice[] @relation("NoticeCreatedBy")
+  chairmanSessions GameSession[] @relation("ChairmanSessions")
+  chairmanAssignments ChairmanAssignment[]
 }
 
 model Team {
@@ -77,4 +83,82 @@ model ScoreEntry {
   @@index([gameId])
   @@index([teamId])
   @@index([userId])
+}
+
+enum SessionStatus {
+  ACTIVE
+  ENDED
+}
+
+enum NoticeKind {
+  NOTICE
+  TALKSHIT
+}
+
+model GameSession {
+  id               String         @id @default(cuid())
+  status           SessionStatus  @default(ACTIVE)
+  startedAt        DateTime       @default(now())
+  endedAt          DateTime?
+  chairmanId       String?
+  chairmanLocked   Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  chairman         User?          @relation("ChairmanSessions", fields: [chairmanId], references: [id])
+  assignments      ChairmanAssignment[]
+  notices          Notice[]
+  beerTransactions BeerTransaction[]
+}
+
+model ChairmanAssignment {
+  id         String      @id @default(cuid())
+  sessionId  String
+  userId     String
+  assignedAt DateTime    @default(now())
+  session    GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([userId])
+}
+
+model PlayerState {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  beerBalance            Int      @default(10)
+  beersReceived          Int      @default(0)
+  talkShitCooldownUntil  DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BeerTransaction {
+  id          String      @id @default(cuid())
+  sessionId   String?
+  fromUserId  String
+  toUserId    String
+  count       Int         @default(1)
+  reason      String?
+  createdAt   DateTime    @default(now())
+  session     GameSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  fromUser    User        @relation("BeerFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser      User        @relation("BeerTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+model Notice {
+  id          String      @id @default(cuid())
+  sessionId   String?
+  message     String
+  kind        NoticeKind  @default(NOTICE)
+  expiresAt   DateTime
+  createdById String?
+  createdAt   DateTime    @default(now())
+  session     GameSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  createdBy   User?       @relation("NoticeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
 }

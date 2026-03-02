@@ -3,6 +3,11 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.notice.deleteMany();
+  await prisma.beerTransaction.deleteMany();
+  await prisma.chairmanAssignment.deleteMany();
+  await prisma.gameSession.deleteMany();
+  await prisma.playerState.deleteMany();
   await prisma.scoreEntry.deleteMany();
   await prisma.user.deleteMany();
   await prisma.game.deleteMany();
@@ -27,14 +32,14 @@ async function main() {
   ]);
 
   const roster = [
-    ["Alex Stone", "alex@olympus.local", spartans.id, "zeus"],
-    ["Blake Hart", "blake@olympus.local", spartans.id, "athena"],
-    ["Casey Drew", "casey@olympus.local", spartans.id, "apollo"],
-    ["Dylan Reed", "dylan@olympus.local", spartans.id, "poseidon"],
-    ["Evan Ward", "evan@olympus.local", titans.id, "ares"],
-    ["Flynn Cole", "flynn@olympus.local", titans.id, "artemis"],
-    ["Grant Hale", "grant@olympus.local", titans.id, "hera"],
-    ["Hayes Quinn", "hayes@olympus.local", titans.id, "hermes"]
+    ["Joe Steelman", "joe@olympus.local", spartans.id, "zeus"],
+    ["Charlie Arthur", "charlie@olympus.local", spartans.id, "athena"],
+    ["Tanner Dinsdale", "tanner@olympus.local", spartans.id, "apollo"],
+    ["Stephen Moorkamp", "stephen@olympus.local", spartans.id, "poseidon"],
+    ["Jason Falcone", "jason@olympus.local", titans.id, "ares"],
+    ["Player 6", "player6@olympus.local", titans.id, "artemis"],
+    ["Player 7", "player7@olympus.local", titans.id, "hera"],
+    ["Player 8", "player8@olympus.local", titans.id, "hermes"]
   ] as const;
 
   const users = await Promise.all(
@@ -50,6 +55,29 @@ async function main() {
       })
     )
   );
+
+  await prisma.playerState.createMany({
+    data: users.map((user) => ({
+      userId: user.id,
+      beerBalance: 10,
+      beersReceived: 0
+    }))
+  });
+
+  const session = await prisma.gameSession.create({
+    data: {
+      status: "ACTIVE",
+      chairmanId: users[0].id,
+      chairmanLocked: true
+    }
+  });
+
+  await prisma.chairmanAssignment.create({
+    data: {
+      sessionId: session.id,
+      userId: users[0].id
+    }
+  });
 
   const games = await Promise.all([
     prisma.game.create({
@@ -74,14 +102,14 @@ async function main() {
         category: "Shooting",
         description: "Nine handgun shots with adjustable ring values.",
         sortOrder: 2,
-        maxAvailablePoints: 180,
+        maxAvailablePoints: 90,
         scoringConfig: {
           style: "silhouette",
           shots: 9,
           adjustableRings: {
-            center: 10,
-            torso: 7,
-            edge: 4
+            center: 5,
+            torso: 3.5,
+            edge: 2
           }
         }
       }
@@ -91,13 +119,16 @@ async function main() {
         key: "golf-match-a",
         name: "Golf Match A",
         category: "Golf",
-        description: "2v2 match play scored by holes remaining.",
+        description: "9-hole match play scored by holes remaining.",
         sortOrder: 3,
-        maxAvailablePoints: 100,
+        maxAvailablePoints: 80,
         scoringConfig: {
           style: "match-play",
           teamsPerMatch: 2,
-          adjustableHoleValue: 10
+          adjustableHoleValue: 20,
+          individualHoleValue: 10,
+          maxTeamPoints: 80,
+          maxIndividualPoints: 40
         }
       }
     }),
@@ -106,13 +137,16 @@ async function main() {
         key: "golf-match-b",
         name: "Golf Match B",
         category: "Golf",
-        description: "Second 2v2 match play rotation.",
+        description: "Second 9-hole match play rotation.",
         sortOrder: 4,
-        maxAvailablePoints: 100,
+        maxAvailablePoints: 80,
         scoringConfig: {
           style: "match-play",
           teamsPerMatch: 2,
-          adjustableHoleValue: 10
+          adjustableHoleValue: 20,
+          individualHoleValue: 10,
+          maxTeamPoints: 80,
+          maxIndividualPoints: 40
         }
       }
     }),
@@ -127,13 +161,13 @@ async function main() {
         scoringConfig: {
           style: "placements",
           payouts: [
-            { place: 1, team: 100, player: 25 },
-            { place: 2, team: 50, player: 20 },
-            { place: 3, team: 25, player: 15 },
-            { place: 4, team: 15, player: 10 },
-            { place: 5, team: 10, player: 7 },
-            { place: 6, team: 5, player: 5 },
-            { place: 7, team: 2, player: 2 },
+            { place: 1, team: 100, player: 30 },
+            { place: 2, team: 50, player: 25 },
+            { place: 3, team: 25, player: 20 },
+            { place: 4, team: 15, player: 15 },
+            { place: 5, team: 10, player: 10 },
+            { place: 6, team: 5, player: 8 },
+            { place: 7, team: 2, player: 5 },
             { place: 8, team: 0, player: 0 }
           ]
         }

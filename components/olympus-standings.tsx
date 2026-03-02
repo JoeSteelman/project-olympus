@@ -16,6 +16,7 @@ type OlympusStandingsProps = {
   ladderLimit?: number;
   ladderExpandable?: boolean;
   ladderExpandedByDefault?: boolean;
+  showActions?: boolean;
 };
 
 type Participant = DashboardLane & {
@@ -203,7 +204,15 @@ function LiveStandings({
   rankDeltas,
   limit,
   expandable,
-  expandedByDefault
+  expandedByDefault,
+  showActions,
+  currentUserId,
+  onTalk,
+  onBeer,
+  onTokenClear,
+  tapToken,
+  cooldownSeconds,
+  playerStates
 }: {
   participants: Participant[];
   activeIndex: number;
@@ -211,10 +220,32 @@ function LiveStandings({
   limit?: number;
   expandable?: boolean;
   expandedByDefault?: boolean;
+  showActions?: boolean;
+  currentUserId?: string;
+  onTalk?: (targetId: string) => void;
+  onBeer?: (targetId: string) => void;
+  onTokenClear?: () => void;
+  tapToken?: "beer" | "poop" | null;
+  cooldownSeconds?: (userId: string) => number;
+  playerStates?: Record<string, any>;
 }) {
   const leaderId = participants[0]?.playerId;
   const [expanded, setExpanded] = useState(expandedByDefault ?? false);
   const visibleCount = expanded || !expandable ? participants.length : limit ?? participants.length;
+
+  const renderTally = (count: number) => {
+    if (!count) return "";
+    const groups = Math.floor(count / 5);
+    const remainder = count % 5;
+    const rows: string[] = [];
+    for (let g = 0; g < groups; g += 1) {
+      rows.push("||||/");
+    }
+    if (remainder) {
+      rows.push("|".repeat(remainder));
+    }
+    return rows.join(" ");
+  };
 
   return (
     <aside className="rounded-2xl border border-white/10 bg-white/8 p-3 backdrop-blur-xl sm:rounded-[28px] sm:p-4">
@@ -278,6 +309,41 @@ function LiveStandings({
                       transition={{ type: "spring", stiffness: 100, damping: 20 }}
                     />
                   </div>
+                  {showActions ? (
+                    <button
+                      type="button"
+                      className="ladder-actions drop-zone"
+                      onClick={() => {
+                        if (!tapToken) return;
+                        if (tapToken === "beer") {
+                          onBeer?.(participant.playerId);
+                        }
+                        if (tapToken === "poop") {
+                          onTalk?.(participant.playerId);
+                        }
+                        onTokenClear?.();
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const token = event.dataTransfer?.getData("text/plain") as "beer" | "poop" | "";
+                        if (!token) return;
+                        if (token === "beer") {
+                          onBeer?.(participant.playerId);
+                        }
+                        if (token === "poop") {
+                          onTalk?.(participant.playerId);
+                        }
+                      }}
+                    >
+                      <span className="drop-label">
+                        {tapToken ? `Tap to send ${tapToken === "beer" ? "🍺" : "💩"}` : "Drop or tap"}
+                      </span>
+                      <span className="beer-tally">
+                        {renderTally(playerStates?.[participant.playerId]?.beersReceived ?? 0)}
+                      </span>
+                    </button>
+                  ) : null}
                   {leader ? (
                     <div className="mt-1 text-[9px] uppercase tracking-[0.26em] text-amber-200/75 sm:mt-1.5 sm:text-[10px]">
                       current leader
@@ -298,7 +364,7 @@ function LiveStandings({
             onClick={() => setExpanded((current) => !current)}
             aria-label={expanded ? "Show fewer" : "Show all"}
           >
-            {expanded ? "–" : "+"}
+            {expanded ? "-" : "+"}
           </button>
         </div>
       ) : null}
@@ -546,7 +612,8 @@ export function OlympusStandings({
   showTrack = true,
   ladderLimit = 4,
   ladderExpandable = true,
-  ladderExpandedByDefault = false
+  ladderExpandedByDefault = false,
+  showActions = false
 }: OlympusStandingsProps) {
   const ranked = useMemo(
     () =>
@@ -583,11 +650,187 @@ export function OlympusStandings({
     await loadFull(engine);
   }, []);
 
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [playerStates, setPlayerStates] = useState<Record<string, any>>({});
+  const [notices, setNotices] = useState<Array<{ id: string; message: string; kind: string }>>([]);
+  const [talkOpen, setTalkOpen] = useState(false);
+  const [talkTargetId, setTalkTargetId] = useState<string | null>(null);
+  const [talkMessage, setTalkMessage] = useState("");
+  const [talkSecondsLeft, setTalkSecondsLeft] = useState(7);
+  const [dragToken, setDragToken] = useState<"beer" | "poop" | null>(null);
+  const [tapToken, setTapToken] = useState<"beer" | "poop" | null>(null);
+
+  useEffect(() => {
+    if (!showActions) return;
+    const stored = typeof window !== "undefined" ? window.localStorage.getItem("olympus-current-user") : null;
+    const fallback = participants[0]?.playerId ?? "";
+    setCurrentUserId(stored || fallback);
+  }, [showActions, participants]);
+
+  useEffect(() => {
+    if (!showActions || !currentUserId) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("olympus-current-user", currentUserId);
+    }
+  }, [showActions, currentUserId]);
+
+  useEffect(() => {
+    if (!showActions) return;
+
+    const fetchData = async () => {
+      const [statesRes, noticesRes] = await Promise.all([
+        fetch("/api/player-state", { cache: "no-store" }),
+        fetch("/api/notice", { cache: "no-store" })
+      ]);
+
+      if (statesRes.ok) {
+        const states = await statesRes.json();
+        const mapped: Record<string, any> = {};
+        states.forEach((state: any) => {
+          mapped[state.userId] = state;
+        });
+        setPlayerStates(mapped);
+      }
+
+      if (noticesRes.ok) {
+        const noticeItems = await noticesRes.json();
+        setNotices(noticeItems);
+      }
+    };
+
+    fetchData();
+    const interval = window.setInterval(fetchData, 5000);
+    return () => window.clearInterval(interval);
+  }, [showActions]);
+
+  useEffect(() => {
+    if (!talkOpen) return;
+    setTalkSecondsLeft(7);
+    const tick = window.setInterval(() => {
+      setTalkSecondsLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(tick);
+          setTalkOpen(false);
+          if (currentUserId && talkTargetId) {
+            fetch("/api/talkshit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fromUserId: currentUserId, toUserId: talkTargetId, timeout: true })
+            });
+          }
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(tick);
+  }, [talkOpen, currentUserId, talkTargetId]);
+
+  const cooldownSeconds = (userId: string) => {
+    const state = playerStates[userId];
+    if (!state?.talkShitCooldownUntil) return 0;
+    const remaining = new Date(state.talkShitCooldownUntil).getTime() - Date.now();
+    return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+  };
+
+  const sendTalk = async () => {
+    if (!currentUserId || !talkTargetId || !talkMessage.trim()) return;
+    await fetch("/api/talkshit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromUserId: currentUserId, toUserId: talkTargetId, message: talkMessage })
+    });
+    setTalkOpen(false);
+    setTalkMessage("");
+  };
+
+  const buyBeer = async (toUserId: string) => {
+    if (!currentUserId) return;
+    await fetch("/api/beer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromUserId: currentUserId, toUserId, count: 1, reason: "buy" })
+    });
+  };
+
+  const shotgunBeer = async () => {
+    if (!currentUserId) return;
+    await fetch("/api/beer", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: currentUserId, add: 3 })
+    });
+  };
+
+  const openTalk = (targetId: string) => {
+    setTalkTargetId(targetId);
+    setTalkMessage("");
+    setTalkOpen(true);
+  };
+
   return (
     <section
       className="overflow-hidden rounded-2xl border border-white/10 p-3 shadow-olympus sm:rounded-[32px] sm:p-6"
       style={{ background: theme.bg }}
     >
+      {showActions ? (
+        <div className="action-bar">
+          <div className="action-row-inline">
+            <span className="eyebrow">You are</span>
+            <select
+              value={currentUserId}
+              onChange={(event) => setCurrentUserId(event.target.value)}
+            >
+              {participants.map((participant) => (
+                <option key={participant.playerId} value={participant.playerId}>
+                  {participant.playerName}
+                </option>
+              ))}
+            </select>
+            <div className="beer-bank">
+              <span className="beer-count">
+                {Array.from({ length: Math.max(0, playerStates[currentUserId]?.beerBalance ?? 0) }).map((_, index) => (
+                  <span
+                    key={`beer-${index}`}
+                    className={`beer-token ${tapToken === "beer" ? "selected" : ""}`}
+                    draggable
+                    onClick={() => setTapToken("beer")}
+                    onDragStart={(event) => {
+                      setDragToken("beer");
+                      event.dataTransfer?.setData("text/plain", "beer");
+                    }}
+                  >
+                    🍺
+                  </span>
+                ))}
+              </span>
+              <span
+                className={`beer-token ${tapToken === "poop" ? "selected" : ""}`}
+                draggable
+                onClick={() => setTapToken("poop")}
+                onDragStart={(event) => {
+                  setDragToken("poop");
+                  event.dataTransfer?.setData("text/plain", "poop");
+                }}
+              >
+                💩
+              </span>
+            </div>
+            <button type="button" className="secondary-link" onClick={shotgunBeer}>
+              Shotgun +3
+            </button>
+          </div>
+          {notices.length ? (
+            <div className="notice-strip">
+              {notices.slice(0, 2).map((notice) => (
+                <span key={notice.id} className={`notice-pill ${notice.kind === "TALKSHIT" ? "talk" : ""}`}>
+                  {notice.message}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 sm:mb-4">
         <div>
           <p className="text-[10px] uppercase tracking-[0.34em] text-amber-200/75 sm:text-xs">Project Olympus</p>
@@ -599,12 +842,6 @@ export function OlympusStandings({
           </h2>
         </div>
         <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.22em] text-white/65 sm:text-xs">
-          <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 sm:px-3 sm:py-2">
-            first to {winningScore}
-          </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 sm:px-3 sm:py-2">
-            {remainingAvailablePoints} left
-          </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-2 py-1 sm:px-3 sm:py-2">
             updated {updatedLabel}
           </div>
@@ -651,9 +888,42 @@ export function OlympusStandings({
             limit={ladderLimit}
             expandable={ladderExpandable}
             expandedByDefault={ladderExpandedByDefault}
+            showActions={showActions}
+            currentUserId={currentUserId}
+            onTalk={openTalk}
+            onBeer={buyBeer}
+            onTokenClear={() => setTapToken(null)}
+            tapToken={tapToken}
+            cooldownSeconds={cooldownSeconds}
+            playerStates={playerStates}
           />
         </div>
       </div>
+
+      {showActions && talkOpen ? (
+        <div className="talk-backdrop" onClick={() => setTalkOpen(false)}>
+          <div className="talk-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="talk-header">
+              <span className="eyebrow">Talk shit</span>
+              <span className="talk-timer">{talkSecondsLeft}s</span>
+            </div>
+            <textarea
+              rows={3}
+              value={talkMessage}
+              onChange={(event) => setTalkMessage(event.target.value)}
+              placeholder="Say it."
+            />
+            <div className="talk-actions">
+              <button type="button" className="secondary-link" onClick={() => setTalkOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="primary-button" onClick={sendTalk}>
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

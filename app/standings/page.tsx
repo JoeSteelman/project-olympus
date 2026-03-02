@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { OlympusStandings } from "@/components/olympus-standings";
 import { getDashboardSummary } from "@/lib/data";
 
@@ -8,6 +9,11 @@ export default async function StandingsPage() {
 
   return (
     <main className="standings-shell">
+      <div className="standings-back">
+        <Link href="/" className="secondary-link">
+          Back to scoreboard
+        </Link>
+      </div>
       <OlympusStandings
         participants={dashboard.lanes}
         winningScore={dashboard.winningScore}
@@ -17,6 +23,7 @@ export default async function StandingsPage() {
         ladderLimit={8}
         ladderExpandable={false}
         ladderExpandedByDefault
+        showActions
       />
     </main>
   );
