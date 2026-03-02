@@ -139,6 +139,7 @@ export const mockDashboard: DashboardSummary = {
       key: "shooting-targets",
       name: "Shooting: .22 Targets",
       category: "Shooting",
+      description: "",
       sortOrder: 1,
       enabled: true,
       scoringConfig: JSON.stringify({ style: "target-pips", shots: 5, tiers: [5, 3, 1] }),
@@ -149,6 +150,7 @@ export const mockDashboard: DashboardSummary = {
       key: "shooting-silhouette",
       name: "Shooting: Silhouette",
       category: "Shooting",
+      description: "",
       sortOrder: 2,
       enabled: true,
       scoringConfig: JSON.stringify({ style: "silhouette", shots: 9, adjustableRings: { center: 5, torso: 3.5, edge: 2 } }),
@@ -159,6 +161,7 @@ export const mockDashboard: DashboardSummary = {
       key: "golf-match-a",
       name: "Golf Match A",
       category: "Golf",
+      description: "",
       sortOrder: 3,
       enabled: true,
       scoringConfig: JSON.stringify({
@@ -176,6 +179,7 @@ export const mockDashboard: DashboardSummary = {
       key: "golf-match-b",
       name: "Golf Match B",
       category: "Golf",
+      description: "",
       sortOrder: 4,
       enabled: true,
       scoringConfig: JSON.stringify({
@@ -193,6 +197,7 @@ export const mockDashboard: DashboardSummary = {
       key: "poker",
       name: "Poker",
       category: "Poker",
+      description: "",
       sortOrder: 5,
       enabled: true,
       scoringConfig: JSON.stringify({
@@ -242,11 +247,12 @@ export const mockAdmin = {
     key: game.key,
     name: game.name,
     category: game.category,
+    description: game.description ?? "",
     sortOrder: game.sortOrder,
     enabled: game.enabled,
     scoringConfig: JSON.parse(game.scoringConfig),
     maxAvailablePoints: game.maxAvailablePoints
-  })),
+  })), 
   config: { eventName: "Project Olympus", winningScore: 500 },
   avatars: GREEK_AVATARS
 };
