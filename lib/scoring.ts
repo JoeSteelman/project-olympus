@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { DashboardSummary, GameSummary, ScoreEntrySummary, TeamSummary } from "@/lib/types";
 
 type DashboardDb = Awaited<ReturnType<typeof loadDashboardDb>>;
+type ScoringConfig = Record<string, any>;
 
 export async function loadDashboardDb() {
   const [config, teams, users, games, entries, recentEntries, activeSession] = await Promise.all([
@@ -86,14 +87,76 @@ function computeTeamSummary(
   };
 }
 
+function getGamePointSummary(
+  game: DashboardDb["games"][number],
+  teamSize: number
+) {
+  const config =
+    game.scoringConfig && typeof game.scoringConfig === "object" && !Array.isArray(game.scoringConfig)
+      ? (game.scoringConfig as ScoringConfig)
+      : {};
+
+  if (config.style === "placements") {
+    const payouts = Array.isArray(config.payouts) ? config.payouts : [];
+    const maxTeamPoints = Math.max(0, ...payouts.map((payout: any) => Number(payout?.team ?? 0)));
+    const maxIndividualPoints = Math.max(0, ...payouts.map((payout: any) => Number(payout?.player ?? 0)));
+
+    return {
+      config,
+      maxAvailablePoints: Number.isFinite(Number(config.maxAvailablePoints))
+        ? Number(config.maxAvailablePoints)
+        : game.maxAvailablePoints,
+      maxTeamPoints,
+      maxIndividualPoints
+    };
+  }
+
+  if (config.style === "target-pips") {
+    const tiers = Array.isArray(config.tiers) ? config.tiers.map((tier: unknown) => Number(tier ?? 0)) : [];
+    const shots = Number(config.shots ?? 0);
+    const maxIndividualPoints = shots * (tiers.length ? Math.max(...tiers) : 0);
+
+    return {
+      config,
+      maxAvailablePoints: Number.isFinite(Number(config.maxAvailablePoints))
+        ? Number(config.maxAvailablePoints)
+        : game.maxAvailablePoints,
+      maxTeamPoints: maxIndividualPoints * teamSize,
+      maxIndividualPoints
+    };
+  }
+
+  if (config.style === "silhouette") {
+    const rings = config.adjustableRings ?? {};
+    const ringValues = [rings.center, rings.torso, rings.edge].map((value: unknown) => Number(value ?? 0));
+    const shots = Number(config.shots ?? 0);
+    const maxIndividualPoints = shots * (ringValues.length ? Math.max(...ringValues) : 0);
+
+    return {
+      config,
+      maxAvailablePoints: Number.isFinite(Number(config.maxAvailablePoints))
+        ? Number(config.maxAvailablePoints)
+        : game.maxAvailablePoints,
+      maxTeamPoints: maxIndividualPoints * teamSize,
+      maxIndividualPoints
+    };
+  }
+
+  const maxAvailablePoints = Number.isFinite(Number(config.maxAvailablePoints))
+    ? Number(config.maxAvailablePoints)
+    : game.maxAvailablePoints;
+
+  return {
+    config,
+    maxAvailablePoints,
+    maxTeamPoints: Number(config.maxTeamPoints ?? maxAvailablePoints),
+    maxIndividualPoints: Number(config.maxIndividualPoints ?? maxAvailablePoints)
+  };
+}
+
 export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
   const winningScore = db.config?.winningScore ?? 500;
   const eventName = db.config?.eventName ?? "Project Olympus";
-  const enabledGames = db.games.filter((game) => game.enabled);
-  const totalAvailablePoints = enabledGames.reduce(
-    (sum, game) => sum + game.maxAvailablePoints,
-    0
-  );
   const totalScoredPoints = db.entries.reduce(
     (sum, entry) => sum + entry.teamPoints + entry.playerPoints,
     0
@@ -214,6 +277,34 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
     console.warn("[DashboardSummary] Referential integrity mismatches detected.", integrityWarnings);
   }
 
+  const sortedRosterByTeam = new Map(
+    db.teams.map((team) => [
+      team.id,
+      [...(rosterByTeam.get(team.id) ?? [])].sort((left, right) => left.name.localeCompare(right.name))
+    ])
+  );
+  const largestRosterSize = Math.max(0, ...Array.from(sortedRosterByTeam.values(), (roster) => roster.length));
+  const games: GameSummary[] = db.games.map((game) => {
+    const pointSummary = getGamePointSummary(game, largestRosterSize);
+
+    return {
+      id: game.id,
+      key: game.key,
+      name: game.name,
+      category: game.category,
+      description: game.description ?? "",
+      sortOrder: game.sortOrder,
+      enabled: game.enabled,
+      scoringConfig: JSON.stringify(pointSummary.config),
+      maxAvailablePoints: pointSummary.maxAvailablePoints,
+      maxTeamPoints: pointSummary.maxTeamPoints,
+      maxIndividualPoints: pointSummary.maxIndividualPoints
+    };
+  });
+  const totalAvailablePoints = games
+    .filter((game) => game.enabled)
+    .reduce((sum, game) => sum + game.maxAvailablePoints, 0);
+
   const teamSummaries = db.teams.map((team) =>
     computeTeamSummary(
       team.id,
@@ -221,9 +312,7 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
       winningScore,
       totalAvailablePoints,
       db.entries,
-      [...(rosterByTeam.get(team.id) ?? [])].sort((left, right) =>
-        left.name.localeCompare(right.name)
-      )
+      sortedRosterByTeam.get(team.id) ?? []
     )
   );
 
@@ -251,18 +340,6 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
       };
     })
   );
-
-  const games: GameSummary[] = db.games.map((game) => ({
-    id: game.id,
-    key: game.key,
-    name: game.name,
-    category: game.category,
-    description: game.description ?? "",
-    sortOrder: game.sortOrder,
-    enabled: game.enabled,
-    scoringConfig: JSON.stringify(game.scoringConfig),
-    maxAvailablePoints: game.maxAvailablePoints
-  }));
 
   const recentEntries: ScoreEntrySummary[] = db.recentEntries.slice(0, 10).map((entry) => ({
     id: entry.id,

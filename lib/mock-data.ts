@@ -144,7 +144,9 @@ export const mockDashboard: DashboardSummary = {
       sortOrder: 1,
       enabled: true,
       scoringConfig: JSON.stringify({ style: "target-pips", shots: 5, tiers: [5, 3, 1] }),
-      maxAvailablePoints: 120
+      maxAvailablePoints: 120,
+      maxTeamPoints: 100,
+      maxIndividualPoints: 25
     },
     {
       id: "g2",
@@ -155,7 +157,9 @@ export const mockDashboard: DashboardSummary = {
       sortOrder: 2,
       enabled: true,
       scoringConfig: JSON.stringify({ style: "silhouette", shots: 9, adjustableRings: { center: 5, torso: 3.5, edge: 2 } }),
-      maxAvailablePoints: 90
+      maxAvailablePoints: 90,
+      maxTeamPoints: 180,
+      maxIndividualPoints: 45
     },
     {
       id: "g3",
@@ -173,7 +177,9 @@ export const mockDashboard: DashboardSummary = {
         maxTeamPoints: 80,
         maxIndividualPoints: 40
       }),
-      maxAvailablePoints: 80
+      maxAvailablePoints: 80,
+      maxTeamPoints: 80,
+      maxIndividualPoints: 40
     },
     {
       id: "g4",
@@ -191,7 +197,9 @@ export const mockDashboard: DashboardSummary = {
         maxTeamPoints: 80,
         maxIndividualPoints: 40
       }),
-      maxAvailablePoints: 80
+      maxAvailablePoints: 80,
+      maxTeamPoints: 80,
+      maxIndividualPoints: 40
     },
     {
       id: "g5",
@@ -214,7 +222,9 @@ export const mockDashboard: DashboardSummary = {
           { place: 8, team: 0, player: 0 }
         ]
       }),
-      maxAvailablePoints: 294
+      maxAvailablePoints: 294,
+      maxTeamPoints: 100,
+      maxIndividualPoints: 30
     }
   ],
   recentEntries: [

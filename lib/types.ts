@@ -52,6 +52,8 @@ export type GameSummary = {
   enabled: boolean;
   scoringConfig: string;
   maxAvailablePoints: number;
+  maxTeamPoints: number;
+  maxIndividualPoints: number;
 };
 
 export type ScoreEntrySummary = {

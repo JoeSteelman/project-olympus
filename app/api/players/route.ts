@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 export async function PATCH(request: NextRequest) {
@@ -47,6 +48,11 @@ export async function PATCH(request: NextRequest) {
         ...(teamId !== undefined ? { teamId } : {})
       }
     });
+
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/admin");
+    revalidatePath("/chairman");
 
     return NextResponse.json(player);
   } catch (error) {

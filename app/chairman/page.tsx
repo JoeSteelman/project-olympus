@@ -65,6 +65,8 @@ export default function ChairmanPage() {
 
   useEffect(() => {
     loadData();
+    const interval = window.setInterval(loadData, 5000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const startSession = async () => {

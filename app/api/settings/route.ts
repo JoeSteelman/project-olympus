@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -71,6 +72,10 @@ export async function PATCH(request: NextRequest) {
         )
       );
     }
+
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/admin");
 
     return NextResponse.json({ ok: true });
   } catch (error) {

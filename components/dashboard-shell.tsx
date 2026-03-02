@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { DashboardSummary } from "@/lib/types";
+import type { DashboardSummary, GameSummary } from "@/lib/types";
 import { OlympusStandings } from "@/components/olympus-standings";
 
 type DashboardShellProps = {
@@ -41,7 +41,6 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
   const activeTeam =
     entryForm.teamId === data.teamB.id ? data.teamB : data.teamA;
   const availablePlayers = activeTeam.roster;
-  const teamSize = data.teamA.roster.length;
 
   useEffect(() => {
     const refresh = async () => {
@@ -268,49 +267,40 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
     resetWizard();
   };
 
-  const describeScoring = (config: Record<string, any>) => {
+  const describeScoring = (game: GameSummary, config: Record<string, any>) => {
     if (!config?.style) {
       return { title: "Scoring", lines: ["No scoring config available."] };
     }
 
     if (config.style === "target-pips") {
       const tiers = (config.tiers ?? []) as number[];
-      const maxShot = tiers.length ? Math.max(...tiers) : 0;
       const shots = Number(config.shots ?? 0);
-      const maxIndividual = shots * maxShot;
-      const maxTeam = maxIndividual * teamSize;
       return {
         title: "Target Pips",
         lines: [
           `${shots} shots`,
           `tiers: ${tiers.join(" / ")}`,
-          `max individual: ${maxIndividual}`,
-          `max team: ${maxTeam}`
+          `max individual: ${game.maxIndividualPoints}`,
+          `max team: ${game.maxTeamPoints}`
         ]
       };
     }
 
     if (config.style === "silhouette") {
       const rings = config.adjustableRings ?? {};
-      const ringValues = [rings.center, rings.torso, rings.edge].map((value) => Number(value ?? 0));
-      const maxShot = ringValues.length ? Math.max(...ringValues) : 0;
       const shots = Number(config.shots ?? 0);
-      const maxIndividual = shots * maxShot;
-      const maxTeam = maxIndividual * teamSize;
       return {
         title: "Silhouette",
         lines: [
           `${shots} shots`,
           `ring values: center ${rings.center ?? "-"}, torso ${rings.torso ?? "-"}, edge ${rings.edge ?? "-"}`,
-          `max individual: ${maxIndividual}`,
-          `max team: ${maxTeam}`
+          `max individual: ${game.maxIndividualPoints}`,
+          `max team: ${game.maxTeamPoints}`
         ]
       };
     }
 
     if (config.style === "match-play") {
-      const maxTeam = config.maxTeamPoints ?? config.maxPoints ?? config.maxAvailablePoints;
-      const maxIndividual = config.maxIndividualPoints ?? config.maxPoints ?? config.maxAvailablePoints;
       const teamHole = config.adjustableHoleValue ?? "-";
       const individualHole = config.individualHoleValue ?? (typeof teamHole === "number" ? teamHole / 2 : "-");
       return {
@@ -319,8 +309,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
           `${config.teamsPerMatch ?? 2} teams per match`,
           `team per-hole: ${teamHole}`,
           `individual per-hole: ${individualHole}`,
-          maxTeam ? `max team: ${maxTeam}` : null,
-          maxIndividual ? `max individual: ${maxIndividual}` : null
+          game.maxTeamPoints ? `max team: ${game.maxTeamPoints}` : null,
+          game.maxIndividualPoints ? `max individual: ${game.maxIndividualPoints}` : null
         ].filter(Boolean) as string[]
       };
     }
@@ -335,37 +325,10 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
     return { title: "Scoring", lines: [JSON.stringify(config)] };
   };
 
-  const getMaxPoints = (game: { maxAvailablePoints: number }, config: Record<string, any>) => {
-    if (config.style === "placements") {
-      const payouts = config.payouts ?? [];
-      const maxTeam = Math.max(0, ...payouts.map((p: any) => Number(p.team ?? 0)));
-      const maxIndividual = Math.max(0, ...payouts.map((p: any) => Number(p.player ?? 0)));
-      return { maxTeam, maxIndividual };
-    }
-
-    if (config.style === "target-pips") {
-      const tiers = (config.tiers ?? []) as number[];
-      const maxShot = tiers.length ? Math.max(...tiers) : 0;
-      const shots = Number(config.shots ?? 0);
-      const maxIndividual = shots * maxShot;
-      const maxTeam = maxIndividual * teamSize;
-      return { maxTeam, maxIndividual };
-    }
-
-    if (config.style === "silhouette") {
-      const rings = config.adjustableRings ?? {};
-      const ringValues = [rings.center, rings.torso, rings.edge].map((value) => Number(value ?? 0));
-      const maxShot = ringValues.length ? Math.max(...ringValues) : 0;
-      const shots = Number(config.shots ?? 0);
-      const maxIndividual = shots * maxShot;
-      const maxTeam = maxIndividual * teamSize;
-      return { maxTeam, maxIndividual };
-    }
-
-    const maxTeam = config.maxTeamPoints ?? game.maxAvailablePoints;
-    const maxIndividual = config.maxIndividualPoints ?? game.maxAvailablePoints;
-    return { maxTeam, maxIndividual };
-  };
+  const getMaxPoints = (game: GameSummary, _config?: Record<string, any>) => ({
+    maxTeam: game.maxTeamPoints,
+    maxIndividual: game.maxIndividualPoints
+  });
 
   return (
     <main className="page-shell">
@@ -474,7 +437,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                 >
                   <strong>{game.name}</strong>
                   <span>{game.category}</span>
-                  <span className="game-card-max">team {getMaxPoints(game, config).maxTeam}</span>
+                  <span className="game-card-max">team {getMaxPoints(game).maxTeam}</span>
                 </button>
               );
             })}
@@ -824,8 +787,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
             <div>
               <h2>Games</h2>
               <div className="section-subline">
-                <span>Team potential {data.games.reduce((sum, game) => sum + getMaxPoints(game, (() => { try { return JSON.parse(game.scoringConfig ?? "{}") as Record<string, any>; } catch { return {} as Record<string, any>; } })()).maxTeam, 0)} pts</span>
-                <span>Individual potential {data.games.reduce((sum, game) => sum + getMaxPoints(game, (() => { try { return JSON.parse(game.scoringConfig ?? "{}") as Record<string, any>; } catch { return {} as Record<string, any>; } })()).maxIndividual, 0)} pts</span>
+                <span>Team potential {data.games.reduce((sum, game) => sum + getMaxPoints(game).maxTeam, 0)} pts</span>
+                <span>Individual potential {data.games.reduce((sum, game) => sum + getMaxPoints(game).maxIndividual, 0)} pts</span>
               </div>
             </div>
             <span>{data.totalScoredPoints} points awarded</span>
@@ -839,7 +802,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                   return {} as Record<string, any>;
                 }
               })();
-              const { title, lines } = describeScoring(config);
+              const { title, lines } = describeScoring(game, config);
               const isOpen = openGameId === game.id;
 
               return (
