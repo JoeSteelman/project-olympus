@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+
+if [ "$branch" != "main" ]; then
+  exit 0
+fi
+
+echo "Running Olympus lint before committing to main..."
+npm run lint

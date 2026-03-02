@@ -57,6 +57,8 @@ The team-size cap is enforced in the player update API.
 npm install
 ```
 
+This also installs the repo's Git hooks automatically via the `prepare` script.
+
 2. Copy the example environment file and fill in your values:
 
 ```bash
@@ -108,6 +110,20 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Git Hooks
+
+This repo uses a tracked `.githooks/` directory for lightweight local guard rails:
+
+- commits made on `main` run `npm run lint`
+- pushes targeting `main` run `npm run build`
+
+If hooks were not configured automatically, run:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 
 ## Supabase + Prisma Notes
 
