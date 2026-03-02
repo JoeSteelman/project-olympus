@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { GREEK_AVATARS } from "@/lib/avatars";
 import { buildDashboardSummary, loadDashboardDb } from "@/lib/scoring";
@@ -8,6 +9,8 @@ function hasDatabase() {
 }
 
 export async function getDashboardSummary() {
+  noStore();
+
   if (!hasDatabase()) {
     return mockDashboard;
   }
@@ -17,6 +20,8 @@ export async function getDashboardSummary() {
 }
 
 export async function getAdminBootstrap() {
+  noStore();
+
   if (!hasDatabase()) {
     return mockAdmin;
   }

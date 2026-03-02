@@ -41,13 +41,39 @@ export async function PATCH(request: NextRequest) {
     const player = await prisma.user.update({
       where: { id: playerId },
       data: {
-        ...(avatarKey ? { avatarKey } : {}),
+        ...(avatarKey !== undefined ? { avatarKey } : {}),
         ...(avatarUrl !== undefined ? { avatarUrl } : {}),
-        ...(displayName ? { displayName } : {}),
-        ...(email ? { email } : {}),
+        ...(displayName !== undefined ? { displayName } : {}),
+        ...(email !== undefined ? { email } : {}),
         ...(teamId !== undefined ? { teamId } : {})
       }
     });
+
+    const persisted =
+      (avatarKey === undefined || player.avatarKey === avatarKey) &&
+      (avatarUrl === undefined || player.avatarUrl === avatarUrl) &&
+      (displayName === undefined || player.displayName === displayName) &&
+      (email === undefined || player.email === email) &&
+      (teamId === undefined || player.teamId === teamId);
+
+    if (!persisted) {
+      console.error("[players.patch] Persisted player does not match requested update.", {
+        playerId,
+        requested: { avatarKey, avatarUrl, displayName, email, teamId },
+        persisted: {
+          avatarKey: player.avatarKey,
+          avatarUrl: player.avatarUrl,
+          displayName: player.displayName,
+          email: player.email,
+          teamId: player.teamId
+        }
+      });
+
+      return NextResponse.json(
+        { error: "Player update did not persist correctly." },
+        { status: 500 }
+      );
+    }
 
     revalidatePath("/");
     revalidatePath("/standings");

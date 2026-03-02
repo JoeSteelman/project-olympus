@@ -20,11 +20,18 @@ export async function PATCH(request: NextRequest) {
       }>;
     };
 
+    let persistedConfig:
+      | {
+          eventName: string;
+          winningScore: number;
+        }
+      | null = null;
+
     if (eventName !== undefined || winningScore !== undefined) {
       const current = await prisma.eventConfig.findFirst();
 
       if (current) {
-        await prisma.eventConfig.update({
+        persistedConfig = await prisma.eventConfig.update({
           where: { id: current.id },
           data: {
             ...(eventName !== undefined ? { eventName } : {}),
@@ -32,17 +39,33 @@ export async function PATCH(request: NextRequest) {
           }
         });
       } else {
-        await prisma.eventConfig.create({
+        persistedConfig = await prisma.eventConfig.create({
           data: {
             eventName: eventName ?? "Project Olympus",
             winningScore: winningScore ?? 500
           }
         });
       }
+
+      const configPersisted =
+        (eventName === undefined || persistedConfig.eventName === eventName) &&
+        (winningScore === undefined || persistedConfig.winningScore === winningScore);
+
+      if (!configPersisted) {
+        console.error("[settings.patch] Event config did not persist correctly.", {
+          requested: { eventName, winningScore },
+          persisted: persistedConfig
+        });
+
+        return NextResponse.json(
+          { error: "Event config update did not persist correctly." },
+          { status: 500 }
+        );
+      }
     }
 
     if (teams?.length) {
-      await Promise.all(
+      const updatedTeams = await Promise.all(
         teams.map((team) =>
           prisma.team.update({
             where: { id: team.id },
@@ -54,10 +77,28 @@ export async function PATCH(request: NextRequest) {
           })
         )
       );
+
+      const teamsPersisted = updatedTeams.every((team) => {
+        const requested = teams.find((candidate) => candidate.id === team.id);
+        return (
+          requested &&
+          team.name === requested.name &&
+          team.slug === requested.slug &&
+          team.color === requested.color
+        );
+      });
+
+      if (!teamsPersisted) {
+        console.error("[settings.patch] Team settings did not persist correctly.");
+        return NextResponse.json(
+          { error: "Team settings update did not persist correctly." },
+          { status: 500 }
+        );
+      }
     }
 
     if (games?.length) {
-      await Promise.all(
+      const updatedGames = await Promise.all(
         games.map((game) =>
           prisma.game.update({
             where: { id: game.id },
@@ -71,11 +112,32 @@ export async function PATCH(request: NextRequest) {
           })
         )
       );
+
+      const gamesPersisted = updatedGames.every((game) => {
+        const requested = games.find((candidate) => candidate.id === game.id);
+        return (
+          requested &&
+          game.name === requested.name &&
+          game.description === requested.description &&
+          game.enabled === requested.enabled &&
+          game.maxAvailablePoints === requested.maxAvailablePoints &&
+          JSON.stringify(game.scoringConfig) === JSON.stringify(requested.scoringConfig)
+        );
+      });
+
+      if (!gamesPersisted) {
+        console.error("[settings.patch] Game settings did not persist correctly.");
+        return NextResponse.json(
+          { error: "Game settings update did not persist correctly." },
+          { status: 500 }
+        );
+      }
     }
 
     revalidatePath("/");
     revalidatePath("/standings");
     revalidatePath("/admin");
+    revalidatePath("/chairman");
 
     return NextResponse.json({ ok: true });
   } catch (error) {
