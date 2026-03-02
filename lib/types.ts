@@ -9,6 +9,7 @@ export type DashboardLane = {
   teamId: string;
   teamName: string;
   points: number;
+  latestDelta?: number | null;
   progressPct: number;
 };
 

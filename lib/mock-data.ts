@@ -47,6 +47,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-a",
       teamName: "Spartans",
       points: 38,
+      latestDelta: 30,
       progressPct: 7.6
     },
     {
@@ -59,6 +60,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-a",
       teamName: "Spartans",
       points: 34,
+      latestDelta: 12,
       progressPct: 6.8
     },
     {
@@ -71,6 +73,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-a",
       teamName: "Spartans",
       points: 29,
+      latestDelta: null,
       progressPct: 5.8
     },
     {
@@ -83,6 +86,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-a",
       teamName: "Spartans",
       points: 26,
+      latestDelta: null,
       progressPct: 5.2
     },
     {
@@ -95,6 +99,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-b",
       teamName: "Titans",
       points: 31,
+      latestDelta: 9,
       progressPct: 6.2
     },
     {
@@ -107,6 +112,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-b",
       teamName: "Titans",
       points: 24,
+      latestDelta: null,
       progressPct: 4.8
     },
     {
@@ -119,6 +125,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-b",
       teamName: "Titans",
       points: 21,
+      latestDelta: null,
       progressPct: 4.2
     },
     {
@@ -131,6 +138,7 @@ export const mockDashboard: DashboardSummary = {
       teamId: "team-b",
       teamName: "Titans",
       points: 19,
+      latestDelta: null,
       progressPct: 3.8
     }
   ],

@@ -209,7 +209,6 @@ function LightningBeam({
 function LiveStandings({
   participants,
   activeIndex,
-  rankDeltas,
   limit,
   expandable,
   expandedByDefault,
@@ -224,7 +223,6 @@ function LiveStandings({
 }: {
   participants: Participant[];
   activeIndex: number;
-  rankDeltas: Map<string, number>;
   limit?: number;
   expandable?: boolean;
   expandedByDefault?: boolean;
@@ -278,6 +276,8 @@ function LiveStandings({
             {participants.slice(0, visibleCount).map((participant, index) => {
               const active = index === activeIndex;
               const leader = participant.playerId === leaderId;
+              const latestDelta = participant.latestDelta ?? 0;
+              const showLatestDelta = latestDelta !== 0;
 
               return (
                 <motion.div
@@ -299,9 +299,15 @@ function LiveStandings({
                         <p className="text-base font-semibold text-white sm:text-lg">
                           {participant.points}
                         </p>
-                        {rankDeltas.get(participant.playerId) ? (
-                          <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                            +{rankDeltas.get(participant.playerId)}
+                        {showLatestDelta ? (
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] ${
+                              latestDelta > 0
+                                ? "bg-emerald-500/20 text-emerald-300"
+                                : "bg-rose-500/20 text-rose-300"
+                            }`}
+                          >
+                            {latestDelta > 0 ? `+${latestDelta}` : latestDelta}
                           </span>
                         ) : null}
                       </div>
@@ -643,19 +649,6 @@ export function OlympusStandings({
     [participants, winningScore]
   );
 
-  const previousRanks = useRef(new Map<string, number>());
-  const rankDeltas = useMemo(() => {
-    const deltas = new Map<string, number>();
-    ranked.forEach((participant) => {
-      const previous = previousRanks.current.get(participant.playerId);
-      if (previous && previous > participant.rank) {
-        deltas.set(participant.playerId, previous - participant.rank);
-      }
-    });
-    previousRanks.current = new Map(ranked.map((participant) => [participant.playerId, participant.rank]));
-    return deltas;
-  }, [ranked]);
-
   const { theme, phase, activeIndex } = useTimeCycle(ranked.length);
   const updatedLabel = new Date(updatedAt).toLocaleTimeString([], {
     hour: "numeric",
@@ -900,7 +893,6 @@ export function OlympusStandings({
           <LiveStandings
             participants={ranked}
             activeIndex={activeIndex}
-            rankDeltas={rankDeltas}
             limit={ladderLimit}
             expandable={ladderExpandable}
             expandedByDefault={ladderExpandedByDefault}

@@ -317,6 +317,15 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
   );
 
   const [teamA, teamB] = teamSummaries;
+  const latestDeltaByUser = new Map<string, number>();
+
+  for (const entry of db.entries) {
+    if (!entry.userId || latestDeltaByUser.has(entry.userId)) {
+      continue;
+    }
+
+    latestDeltaByUser.set(entry.userId, entry.playerPoints + entry.teamPoints);
+  }
 
   const lanes = teamSummaries.flatMap((team) =>
     team.roster.map((player) => {
@@ -336,6 +345,7 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
         teamId: team.id,
         teamName: team.name,
         points,
+        latestDelta: latestDeltaByUser.get(player.id) ?? null,
         progressPct: Number(Math.min((points / Math.max(winningScore, 1)) * 100, 100).toFixed(1))
       };
     })
