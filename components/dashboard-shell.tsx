@@ -416,6 +416,12 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
             );
           })}
         </div>
+
+        {data.integrityWarnings.length ? (
+          <div className="integrity-banner" role="status">
+            <strong>Data warning:</strong> found {data.integrityWarnings.length} roster or score reference mismatch{data.integrityWarnings.length === 1 ? "" : "es"}. Display is still live; check server logs for details.
+          </div>
+        ) : null}
       </section>
 
       <OlympusStandings
@@ -511,7 +517,11 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                     className={`avatar-button ${wizardState.playerId === player.id ? "active" : ""}`}
                     onClick={() => setWizardState((current) => ({ ...current, playerId: player.id }))}
                   >
-                    {player.name.split(" ")[0][0]}
+                    {player.avatarUrl ? (
+                      <img src={player.avatarUrl} alt={player.name} className="avatar-button-image" />
+                    ) : (
+                      player.name.split(" ")[0][0]
+                    )}
                   </button>
                 ))}
               </div>

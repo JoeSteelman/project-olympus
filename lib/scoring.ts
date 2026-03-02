@@ -5,18 +5,16 @@ import type { DashboardSummary, GameSummary, ScoreEntrySummary, TeamSummary } fr
 type DashboardDb = Awaited<ReturnType<typeof loadDashboardDb>>;
 
 export async function loadDashboardDb() {
-  const [config, teams, games, entries, recentEntries] = await Promise.all([
+  const [config, teams, users, games, entries, recentEntries, activeSession] = await Promise.all([
     prisma.eventConfig.findFirst(),
     prisma.team.findMany({
-      include: {
-        players: {
-          orderBy: {
-            displayName: "asc"
-          }
-        }
-      },
       orderBy: {
         createdAt: "asc"
+      }
+    }),
+    prisma.user.findMany({
+      orderBy: {
+        displayName: "asc"
       }
     }),
     prisma.game.findMany({
@@ -42,10 +40,22 @@ export async function loadDashboardDb() {
         createdAt: "desc"
       },
       take: 24
+    }),
+    prisma.gameSession.findFirst({
+      where: {
+        status: "ACTIVE"
+      },
+      include: {
+        assignments: {
+          orderBy: {
+            assignedAt: "desc"
+          }
+        }
+      }
     })
   ]);
 
-  return { config, teams, games, entries, recentEntries };
+  return { config, teams, users, games, entries, recentEntries, activeSession };
 }
 
 function computeTeamSummary(
@@ -88,6 +98,121 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
     (sum, entry) => sum + entry.teamPoints + entry.playerPoints,
     0
   );
+  const knownTeamIds = new Set(db.teams.map((team) => team.id));
+  const knownGameIds = new Set(db.games.map((game) => game.id));
+  const knownUserIds = new Set(db.users.map((user) => user.id));
+  const integrityWarnings: string[] = [];
+  const addWarning = (message: string) => {
+    if (!integrityWarnings.includes(message)) {
+      integrityWarnings.push(message);
+    }
+  };
+  const assignmentTeamByUser = new Map<string, string | null>();
+
+  if (db.activeSession) {
+    db.activeSession.assignments.forEach((assignment) => {
+      if (assignmentTeamByUser.has(assignment.userId)) {
+        addWarning(`Duplicate session roster assignment for member ${assignment.userId}; using the most recent row.`);
+        return;
+      }
+
+      if (!knownUserIds.has(assignment.userId)) {
+        addWarning(`Session roster assignment references missing member ${assignment.userId}.`);
+        return;
+      }
+
+      if (assignment.teamId && !knownTeamIds.has(assignment.teamId)) {
+        addWarning(
+          `Session roster assignment for member ${assignment.userId} references missing team ${assignment.teamId}.`
+        );
+        assignmentTeamByUser.set(assignment.userId, null);
+        return;
+      }
+
+      assignmentTeamByUser.set(assignment.userId, assignment.teamId ?? null);
+    });
+  }
+
+  const effectiveTeamByUser = new Map<string, string | null>();
+  const rosterByTeam = new Map<string, TeamSummary["roster"]>(
+    db.teams.map((team) => [team.id, []])
+  );
+
+  db.users.forEach((user) => {
+    if (user.teamId && !knownTeamIds.has(user.teamId)) {
+      addWarning(`Member ${user.displayName} references missing home team ${user.teamId}.`);
+    }
+
+    const sessionTeamId =
+      db.activeSession && assignmentTeamByUser.has(user.id)
+        ? assignmentTeamByUser.get(user.id) ?? null
+        : null;
+
+    if (db.activeSession && !assignmentTeamByUser.has(user.id)) {
+      addWarning(
+        `Active session is missing a roster assignment for ${user.displayName}; falling back to their saved team.`
+      );
+    }
+
+    const effectiveTeamId =
+      db.activeSession && assignmentTeamByUser.has(user.id)
+        ? sessionTeamId
+        : user.teamId ?? null;
+
+    if (effectiveTeamId && !knownTeamIds.has(effectiveTeamId)) {
+      addWarning(`Member ${user.displayName} resolves to unknown team ${effectiveTeamId}.`);
+      effectiveTeamByUser.set(user.id, null);
+      return;
+    }
+
+    effectiveTeamByUser.set(user.id, effectiveTeamId);
+
+    if (!effectiveTeamId) {
+      return;
+    }
+
+    const roster = rosterByTeam.get(effectiveTeamId);
+    if (!roster) {
+      addWarning(`Member ${user.displayName} resolved to unavailable team ${effectiveTeamId}.`);
+      return;
+    }
+
+    roster.push({
+      id: user.id,
+      name: user.displayName,
+      email: user.email,
+      avatarKey: user.avatarKey,
+      avatarUrl: user.avatarUrl,
+      teamId: effectiveTeamId
+    });
+  });
+
+  db.entries.forEach((entry) => {
+    if (!knownGameIds.has(entry.gameId)) {
+      addWarning(`Score entry ${entry.id} references missing game ${entry.gameId}.`);
+    }
+
+    if (!knownTeamIds.has(entry.teamId)) {
+      addWarning(`Score entry ${entry.id} references missing team ${entry.teamId}.`);
+    }
+
+    if (entry.userId && !knownUserIds.has(entry.userId)) {
+      addWarning(`Score entry ${entry.id} references missing member ${entry.userId}.`);
+    }
+
+    if (entry.userId && knownUserIds.has(entry.userId)) {
+      const playerTeamId = effectiveTeamByUser.get(entry.userId);
+      if (playerTeamId && playerTeamId !== entry.teamId) {
+        addWarning(
+          `Score entry ${entry.id} assigns ${entry.user?.displayName ?? entry.userId} to team ${entry.teamId}, but their displayed roster team is ${playerTeamId}.`
+        );
+      }
+    }
+  });
+
+  if (integrityWarnings.length) {
+    console.warn("[DashboardSummary] Referential integrity mismatches detected.", integrityWarnings);
+  }
 
   const teamSummaries = db.teams.map((team) =>
     computeTeamSummary(
@@ -96,20 +221,16 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
       winningScore,
       totalAvailablePoints,
       db.entries,
-      team.players.map((player) => ({
-        id: player.id,
-        name: player.displayName,
-        email: player.email,
-        avatarKey: player.avatarKey,
-        teamId: team.id
-      }))
+      [...(rosterByTeam.get(team.id) ?? [])].sort((left, right) =>
+        left.name.localeCompare(right.name)
+      )
     )
   );
 
   const [teamA, teamB] = teamSummaries;
 
-  const lanes = db.teams.flatMap((team) =>
-    team.players.map((player) => {
+  const lanes = teamSummaries.flatMap((team) =>
+    team.roster.map((player) => {
       const avatar = getAvatar(player.avatarKey);
       const points = db.entries
         .filter((entry) => entry.userId === player.id)
@@ -117,8 +238,9 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
 
       return {
         playerId: player.id,
-        playerName: player.displayName,
+        playerName: player.name,
         avatarKey: avatar.key,
+        avatarUrl: player.avatarUrl,
         avatarName: avatar.name,
         avatarSymbol: avatar.symbol,
         avatarColor: avatar.color,
@@ -176,6 +298,7 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
     },
     lanes: lanes.sort((left, right) => right.points - left.points),
     games,
-    recentEntries
+    recentEntries,
+    integrityWarnings
   };
 }

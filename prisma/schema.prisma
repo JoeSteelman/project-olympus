@@ -20,6 +20,7 @@ model User {
   role        AppRole     @default(PLAYER)
   teamId      String?
   avatarKey   String      @default("zeus")
+  avatarUrl   String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   team        Team?       @relation(fields: [teamId], references: [id])
@@ -41,6 +42,7 @@ model Team {
   updatedAt DateTime @updatedAt
   players   User[]
   results   ScoreEntry[]
+  chairmanAssignments ChairmanAssignment[]
 }
 
 model Game {
@@ -114,12 +116,15 @@ model ChairmanAssignment {
   id         String      @id @default(cuid())
   sessionId  String
   userId     String
+  teamId     String?
   assignedAt DateTime    @default(now())
   session    GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team       Team?       @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@index([sessionId])
   @@index([userId])
+  @@index([teamId])
 }
 
 model PlayerState {

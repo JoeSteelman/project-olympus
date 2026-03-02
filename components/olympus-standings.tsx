@@ -131,7 +131,15 @@ function GodAvatar({ participant, active }: { participant: Participant; active: 
         }}
         transition={{ type: "spring", stiffness: 100, damping: 20 }}
       >
-        {participant.avatarSymbol}
+        {participant.avatarUrl ? (
+          <img
+            src={participant.avatarUrl}
+            alt={participant.playerName}
+            className="h-full w-full rounded-full object-cover"
+          />
+        ) : (
+          participant.avatarSymbol
+        )}
       </motion.div>
       <div className="min-w-0">
         <p className="truncate text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/80 sm:text-sm">
@@ -550,7 +558,15 @@ function RaceTrack({
                       color: "#09111f"
                     }}
                   >
-                    {participant.avatarSymbol}
+                    {participant.avatarUrl ? (
+                      <img
+                        src={participant.avatarUrl}
+                        alt={participant.playerName}
+                        className="h-full w-full rounded-full object-cover"
+                      />
+                    ) : (
+                      participant.avatarSymbol
+                    )}
                   </div>
                   <div className="hidden pr-2 sm:block">
                     <p className="text-[11px] uppercase tracking-[0.22em] text-white/55">{participant.teamName}</p>

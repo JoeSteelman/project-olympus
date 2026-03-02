@@ -2,6 +2,7 @@ export type DashboardLane = {
   playerId: string;
   playerName: string;
   avatarKey: string;
+  avatarUrl?: string | null;
   avatarName: string;
   avatarSymbol: string;
   avatarColor: string;
@@ -22,6 +23,7 @@ export type DashboardSummary = {
   lanes: DashboardLane[];
   games: GameSummary[];
   recentEntries: ScoreEntrySummary[];
+  integrityWarnings: string[];
 };
 
 export type TeamSummary = {
@@ -35,6 +37,7 @@ export type TeamSummary = {
     name: string;
     email: string;
     avatarKey: string;
+    avatarUrl?: string | null;
     teamId: string;
   }[];
 };

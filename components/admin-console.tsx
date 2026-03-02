@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { GreekAvatar } from "@/lib/avatars";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type AdminBootstrap = {
   dashboard: {
@@ -13,6 +14,7 @@ type AdminBootstrap = {
     displayName: string;
     email: string;
     avatarKey: string;
+    avatarUrl?: string | null;
     teamId: string | null;
   }>;
   teams: Array<{
@@ -43,9 +45,13 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
   const [games, setGames] = useState(initialData.games);
   const [players, setPlayers] = useState(initialData.players);
   const [message, setMessage] = useState("");
+  const [uploadingPlayerId, setUploadingPlayerId] = useState<string | null>(null);
+  const uploadsEnabled = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
 
   const teamLookup = useMemo(
-    () => new Map(initialData.teams.map((team) => [team.id, team.name])),
+    () => new Map(initialData.teams.map((team) => [team.id, team])),
     [initialData.teams]
   );
 
@@ -67,7 +73,7 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
     playerId: string,
     payload: {
       avatarKey?: string;
-      teamId?: string | null;
+      avatarUrl?: string | null;
       displayName?: string;
       email?: string;
     }
@@ -81,7 +87,7 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
     });
 
     if (!response.ok) {
-      setMessage("Player update failed.");
+      setMessage("Member update failed.");
       return;
     }
 
@@ -90,7 +96,60 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
         player.id === playerId ? { ...player, ...payload } : player
       )
     );
-    setMessage("Player updated.");
+    setMessage("Member updated.");
+  }
+
+  async function uploadAvatar(playerId: string, file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (!uploadsEnabled) {
+      setMessage("Avatar upload requires Supabase browser keys.");
+      return;
+    }
+
+    const supabase = (() => {
+      try {
+        return createSupabaseBrowserClient();
+      } catch (error) {
+        console.error(error);
+        setMessage("Avatar upload is not configured.");
+        return null;
+      }
+    })();
+
+    if (!supabase) {
+      return;
+    }
+
+    try {
+      const extension = file.name.includes(".") ? file.name.split(".").pop() : "png";
+      const filePath = `members/${playerId}-${Date.now()}.${extension ?? "png"}`;
+      const bucket = process.env.NEXT_PUBLIC_SUPABASE_AVATAR_BUCKET || "member-avatars";
+
+      setUploadingPlayerId(playerId);
+      setMessage("Uploading avatar...");
+
+      const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
+        upsert: true,
+        contentType: file.type || undefined
+      });
+
+      if (error) {
+        console.error(error);
+        setMessage("Avatar upload failed.");
+        return;
+      }
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      await updatePlayer(playerId, { avatarUrl: data.publicUrl });
+    } catch (error) {
+      console.error(error);
+      setMessage("Avatar upload failed.");
+    } finally {
+      setUploadingPlayerId(null);
+    }
   }
 
   return (
@@ -100,7 +159,7 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
         <div className="hero-header">
           <div>
             <h1>Olympus controls</h1>
-            <p>Configure users, rosters, game scoring, and win conditions.</p>
+            <p>Manage members and teams here. Session roster assignments now happen in Chairman.</p>
           </div>
           <span className="score-pill">{message}</span>
         </div>
@@ -133,14 +192,23 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
 
         <div className="card">
           <div className="section-heading">
-            <h2>Team Rosters</h2>
+            <h2>Members</h2>
           </div>
           <div className="roster-grid">
             {players.map((player) => (
               <div key={player.id} className="roster-card">
-                <div>
-                  <strong>{player.displayName}</strong>
-                  <p>{player.email}</p>
+                <div className="member-avatar-shell">
+                  <div className="member-avatar-preview">
+                    {player.avatarUrl ? (
+                      <img src={player.avatarUrl} alt={`${player.displayName} avatar`} />
+                    ) : (
+                      <span>{player.displayName.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div>
+                    <strong>{player.displayName}</strong>
+                    <p>{player.email}</p>
+                  </div>
                 </div>
                 <label>
                   <span>Name</span>
@@ -176,22 +244,6 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
                   />
                 </label>
                 <label>
-                  <span>Team</span>
-                  <select
-                    value={player.teamId ?? ""}
-                    onChange={(event) =>
-                      updatePlayer(player.id, { teamId: event.target.value || null })
-                    }
-                  >
-                    <option value="">Unassigned</option>
-                    {initialData.teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
                   <span>Greek avatar</span>
                   <select
                     value={player.avatarKey}
@@ -206,9 +258,41 @@ export function AdminConsole({ initialData }: AdminConsoleProps) {
                     ))}
                   </select>
                 </label>
+                <label>
+                  <span>Avatar image</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => uploadAvatar(player.id, event.target.files?.[0] ?? null)}
+                  />
+                </label>
                 <span className="mini-note">
-                  {player.teamId ? teamLookup.get(player.teamId) : "No team assigned"}
+                  {player.teamId ? `Saved home team: ${teamLookup.get(player.teamId)?.name ?? "Unknown"}` : "No saved home team"}
                 </span>
+                {uploadingPlayerId === player.id ? <span className="mini-note">Uploading image...</span> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="section-heading">
+            <h2>Teams</h2>
+          </div>
+          <div className="roster-grid">
+            {initialData.teams.map((team) => (
+              <div key={team.id} className="roster-card">
+                <div className="member-avatar-shell">
+                  <span className="team-color-swatch" style={{ background: team.color }} />
+                  <div>
+                    <strong>{team.name}</strong>
+                    <p>{team.slug}</p>
+                  </div>
+                </div>
+                <span className="mini-note">
+                  Saved home members: {players.filter((player) => player.teamId === team.id).length}
+                </span>
+                <span className="mini-note">Use Chairman to assign the active session roster.</span>
               </div>
             ))}
           </div>

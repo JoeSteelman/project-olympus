@@ -9,6 +9,7 @@ export const mockDashboard: DashboardSummary = {
   winningScore: 500,
   totalScoredPoints: 95,
   remainingAvailablePoints: 600,
+  integrityWarnings: [],
   teamA: {
     id: "team-a",
     name: "Spartans",
@@ -236,7 +237,8 @@ export const mockAdmin = {
     displayName: player.name,
     email: player.email,
     teamId: player.id.startsWith("p1") || player.id.startsWith("p2") || player.id.startsWith("p3") || player.id.startsWith("p4") ? "team-a" : "team-b",
-    avatarKey: player.avatarKey
+    avatarKey: player.avatarKey,
+    avatarUrl: null
   })),
   teams: [
     { id: "team-a", name: "Spartans", slug: "spartans", color: "#d8b44b", players: [] },

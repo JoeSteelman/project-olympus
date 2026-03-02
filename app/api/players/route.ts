@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { playerId, avatarKey, displayName, email, teamId } = body as {
+    const { playerId, avatarKey, avatarUrl, displayName, email, teamId } = body as {
       playerId?: string;
       avatarKey?: string;
+      avatarUrl?: string | null;
       displayName?: string;
       email?: string;
       teamId?: string | null;
@@ -40,6 +41,7 @@ export async function PATCH(request: NextRequest) {
       where: { id: playerId },
       data: {
         ...(avatarKey ? { avatarKey } : {}),
+        ...(avatarUrl !== undefined ? { avatarUrl } : {}),
         ...(displayName ? { displayName } : {}),
         ...(email ? { email } : {}),
         ...(teamId !== undefined ? { teamId } : {})
