@@ -11,6 +11,14 @@ type DashboardShellProps = {
 
 export function DashboardShell({ initialData }: DashboardShellProps) {
   const [data, setData] = useState(initialData);
+  const formatShortName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "";
+    if (parts.length === 1) return parts[0];
+    const first = parts[0];
+    const lastInitial = parts[parts.length - 1][0]?.toUpperCase() ?? "";
+    return `${first} ${lastInitial}.`;
+  };
   const [entryForm, setEntryForm] = useState({
     gameId: initialData.games[0]?.id ?? "",
     teamId: initialData.teamA.id,
@@ -482,9 +490,8 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                   >
                     {player.avatarUrl ? (
                       <img src={player.avatarUrl} alt={player.name} className="avatar-button-image" />
-                    ) : (
-                      player.name.split(" ")[0][0]
-                    )}
+                    ) : null}
+                    <span className="avatar-button-name">{formatShortName(player.name)}</span>
                   </button>
                 ))}
               </div>
