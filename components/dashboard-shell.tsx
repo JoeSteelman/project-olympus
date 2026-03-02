@@ -850,7 +850,7 @@ export function DashboardShell({ initialData }: DashboardShellProps) {
                     <div className="game-details">
                       <div className="game-details-title">{title}</div>
                       <ul>
-                        {lines.map((line) => (
+                        {lines.map((line: string) => (
                           <li key={line}>{line}</li>
                         ))}
                       </ul>
