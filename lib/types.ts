@@ -44,6 +44,7 @@ export type GameSummary = {
   key: string;
   name: string;
   category: string;
+  description?: string;
   sortOrder: number;
   enabled: boolean;
   scoringConfig: string;

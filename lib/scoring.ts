@@ -135,6 +135,7 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
     key: game.key,
     name: game.name,
     category: game.category,
+    description: game.description ?? "",
     sortOrder: game.sortOrder,
     enabled: game.enabled,
     scoringConfig: JSON.stringify(game.scoringConfig),
