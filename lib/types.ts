@@ -35,6 +35,7 @@ export type TeamSummary = {
     name: string;
     email: string;
     avatarKey: string;
+    teamId: string;
   }[];
 };
 

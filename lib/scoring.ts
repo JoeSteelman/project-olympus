@@ -100,7 +100,8 @@ export function buildDashboardSummary(db: DashboardDb): DashboardSummary {
         id: player.id,
         name: player.displayName,
         email: player.email,
-        avatarKey: player.avatarKey
+        avatarKey: player.avatarKey,
+        teamId: team.id
       }))
     )
   );

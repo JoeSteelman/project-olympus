@@ -16,10 +16,10 @@ export const mockDashboard: DashboardSummary = {
     remainingToWin: 445,
     winProbability: 58.4,
     roster: [
-      { id: "p1", name: "Joe Steelman", email: "joe@olympus.local", avatarKey: "zeus" },
-      { id: "p2", name: "Charlie Arthur", email: "charlie@olympus.local", avatarKey: "athena" },
-      { id: "p3", name: "Tanner Dinsdale", email: "tanner@olympus.local", avatarKey: "apollo" },
-      { id: "p4", name: "Stephen Moorkamp", email: "stephen@olympus.local", avatarKey: "poseidon" }
+      { id: "p1", name: "Joe Steelman", email: "joe@olympus.local", avatarKey: "zeus", teamId: "team-a" },
+      { id: "p2", name: "Charlie Arthur", email: "charlie@olympus.local", avatarKey: "athena", teamId: "team-a" },
+      { id: "p3", name: "Tanner Dinsdale", email: "tanner@olympus.local", avatarKey: "apollo", teamId: "team-a" },
+      { id: "p4", name: "Stephen Moorkamp", email: "stephen@olympus.local", avatarKey: "poseidon", teamId: "team-a" }
     ]
   },
   teamB: {
@@ -29,10 +29,10 @@ export const mockDashboard: DashboardSummary = {
     remainingToWin: 460,
     winProbability: 41.6,
     roster: [
-      { id: "p5", name: "Jason Falcone", email: "jason@olympus.local", avatarKey: "ares" },
-      { id: "p6", name: "Player 6", email: "player6@olympus.local", avatarKey: "artemis" },
-      { id: "p7", name: "Player 7", email: "player7@olympus.local", avatarKey: "hera" },
-      { id: "p8", name: "Player 8", email: "player8@olympus.local", avatarKey: "hermes" }
+      { id: "p5", name: "Jason Falcone", email: "jason@olympus.local", avatarKey: "ares", teamId: "team-b" },
+      { id: "p6", name: "Player 6", email: "player6@olympus.local", avatarKey: "artemis", teamId: "team-b" },
+      { id: "p7", name: "Player 7", email: "player7@olympus.local", avatarKey: "hera", teamId: "team-b" },
+      { id: "p8", name: "Player 8", email: "player8@olympus.local", avatarKey: "hermes", teamId: "team-b" }
     ]
   },
   lanes: [
